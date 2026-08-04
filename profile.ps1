@@ -22,13 +22,6 @@
 # }
 
 
-Import-Module posh-git
-function Set-PoshGitStatus {
-    $global:GitStatus = Get-GitStatus
-    $env:POSH_GIT_STRING = Write-GitStatus -Status $global:GitStatus
-}
-
-New-Alias -Name 'Set-PoshContext' -Value 'Set-PoshGitStatus' -Scope Global -Force
 oh-my-posh init pwsh --config ~/.config/omp/ethan.omp.json  | Invoke-Expression
 Invoke-Expression (& { (zoxide init powershell | Out-String) })
 
@@ -63,6 +56,8 @@ function lt { lsd -l --tree --depth=4 @args}
 del alias:gl -Force
 del alias:gp -Force
 del alias:gc -Force
+del alias:ps -Force
+
 function gs  { git status @args }
 function ga  { git add @args }
 function gl  { git log @args }
@@ -75,6 +70,8 @@ function gcA  { git commit --amend @args }
 function gca  { git commit --amend -c HEAD @args }
 function grp  { git rev-parse HEAD @args }
 function gcp  { $commit = git rev-parse HEAD; $commit | Set-Clipboard; echo $commit }
+function ps  { handle64 -v @args }
+
 
 
 # Custom functions
@@ -82,7 +79,7 @@ function gcp  { $commit = git rev-parse HEAD; $commit | Set-Clipboard; echo $com
 Set-Alias vs nvim-temp
 
 # $GitPromptSettings.EnableFileStatus = $false
-$GitPromptSettings.DefaultPromptWriteStatusFirst = $true
+# $GitPromptSettings.DefaultPromptWriteStatusFirst = $true
 . "$HOME\Documents\PowerShell\fzf-gitadd-widget.ps1"
 
 # Functions
@@ -97,3 +94,6 @@ Set-Alias -Name 'f' -Value 'yazi'
 . "$PSScriptRoot\Functions\New-GitWorktree.ps1"
 Set-Alias -Name 'gwt' -Value 'New-GitWorktree'
 
+
+. "$PSScriptRoot\Functions\Get-LockingProcess.ps1"
+Set-Alias -Name 'glp' -Value 'Get-LockingProcess'
