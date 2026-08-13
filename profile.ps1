@@ -1,28 +1,11 @@
-# function prompt {
-#     Write-Host
-#
-#     $path = Get-Location
-#     Write-Host $path -ForegroundColor Yellow -NoNewline
-#
-#     $branch = git branch --show-current 2>$null
-#     if ($LASTEXITCODE -eq 0 -and $branch) {
-#         Write-Host " (" -NoNewline
-#         Write-Host $branch -ForegroundColor Magenta -NoNewline
-#
-#         # Show a red * if there are uncommitted changes
-#         $dirty = git status --porcelain 2>$null
-#         if ($dirty) {
-#             Write-Host "*" -ForegroundColor Red -NoNewline
-#         }
-#
-#         Write-Host ")" -NoNewline
-#     }
-#
-#     return "`n> "
-# }
+Import-Module posh-git
 
+# Custom prompt
+. "$PSScriptRoot\prompt\Prompt.ps1"
 
-oh-my-posh init pwsh --config ~/.config/omp/ethan.omp.json  | Invoke-Expression
+# OLD oh-my-posh prompt
+# oh-my-posh init pwsh --config ~/.config/omp/ethan.omp.json  | Invoke-Expression
+
 Invoke-Expression (& { (zoxide init powershell | Out-String) })
 
 
