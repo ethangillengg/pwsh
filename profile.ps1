@@ -40,6 +40,7 @@ $ENV:STARSHIP_CONFIG = "$HOME\.config\starship\starship.toml"
 $Env:KOMOREBI_CONFIG_HOME = "$HOME\.config\komorebi"
 $ENV:FZF_DEFAULT_OPTS += " --layout=reverse"
 $ENV:YAZI_FILE_ONE += "C:\Program Files\Git\usr\bin\file.exe"
+$Env:COPILOT_AUTO_UPDATE="false" # For: https://github.com/github/copilot-cli/issues/4439
 
 
 # General aliases
@@ -94,6 +95,12 @@ Set-Alias -Name 'f' -Value 'yazi'
 . "$PSScriptRoot\Functions\New-GitWorktree.ps1"
 Set-Alias -Name 'gwt' -Value 'New-GitWorktree'
 
+. "$PSScriptRoot\Functions\New-GitBranch.ps1"
+Set-Alias -Name 'gb' -Value 'New-GitBranch'
 
-. "$PSScriptRoot\Functions\Get-LockingProcess.ps1"
-Set-Alias -Name 'glp' -Value 'Get-LockingProcess'
+
+. "$PSScriptRoot\Functions\Komorebi-RefreshMonitors.ps1"
+Set-Alias -Name 'krf' -Value 'Komorebi-RefreshMonitors'
+
+. "$PSScriptRoot\Functions\Komorebi-Toggle.ps1"
+Set-Alias -Name 'kr' -Value 'Komorebi-Toggle'

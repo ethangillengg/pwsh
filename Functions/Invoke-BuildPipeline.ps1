@@ -8,7 +8,7 @@ function Invoke-BuildPipeline {
         [int]$PipelineId = 13
     )
 
-    $expectedOriginUrl = "https://github.com/AbacusDatagraphics/AbaData2.git"
+    $expectedOriginUrl = "git@github.com:AbacusDatagraphics/AbaData2"
     $actualOriginUrl = git remote get-url origin 2>$null
 
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($actualOriginUrl)) {
