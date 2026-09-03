@@ -71,6 +71,7 @@ del alias:gl -Force
 del alias:gp -Force
 del alias:gc -Force
 del alias:ps -Force
+del alias:gi -Force
 
 function gs  { git status @args }
 function ga  { git add @args }
@@ -84,6 +85,7 @@ function gcA  { git commit --amend @args }
 function gca  { git commit --amend -c HEAD @args }
 function grp  { git rev-parse HEAD @args }
 function gcp  { $commit = git rev-parse HEAD; $commit | Set-Clipboard; echo $commit }
+function gi  { gh dash @args }
 function ps  { handle64 -v @args }
 __ProfileMark "aliases and git functions"
 
