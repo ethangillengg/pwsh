@@ -4,7 +4,7 @@
 # Layout:
 #   Line 1 left:  <cyan>path</> <white>on</> <yellow>[</><magenta>branch</><yellow>]</>[<yellow>[</><red>working</> <green>staging</><yellow>]</>][<yellow>[</><cyan>branchStatus</><yellow>]</>]
 #   Line 1 right: <lightblack> exec-time</>  <black> time</>
-#   Line 2:       <lightGreen>❯</> (trailing space)
+#   Line 2:       <lightGreen|red>❯</> (trailing space)
 
 function Get-PromptPath {
     $path = $PWD.ProviderPath
@@ -77,10 +77,12 @@ function Get-VisibleLength {
 }
 
 function prompt {
+    $previousCommandFailed = -not $?
     $cyan = $PSStyle.Foreground.Cyan
     $lightBlack = $PSStyle.Foreground.BrightBlack
     $black = $PSStyle.Foreground.Black
     $lightGreen = $PSStyle.Foreground.BrightGreen
+    $red = $PSStyle.Foreground.Red
     $reset = $PSStyle.Reset
 
     # Left side: path + git segment
@@ -107,5 +109,7 @@ function prompt {
     $padding = $width - $leftLen - $rightLen
     if ($padding -lt 1) { $padding = 1 }
 
-    return "$left$(' ' * $padding)$right`n${lightGreen}❯${reset} "
+    $arrowColor = if ($previousCommandFailed) { $red } else { $lightGreen }
+    $null = Get-Variable -Name PSVersionTable
+    return "$left$(' ' * $padding)$right`n${arrowColor}❯${reset} "
 }

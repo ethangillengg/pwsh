@@ -30,7 +30,16 @@ Invoke-Expression (& { (zoxide init powershell | Out-String) })
 __ProfileMark "zoxide init"
 
 # Readline Options
-Set-PsReadLineOption -EditMode Vi
+Set-PsReadLineOption -EditMode Vi -ViModeIndicator Script -ViModeChangeHandler {
+    param($mode)
+    $escape = [char]27
+    $bell = [char]7
+    if ($mode -eq 'Command') {
+        Write-Host -NoNewline "${escape}]12;#c678dd${bell}"
+    } else {
+        Write-Host -NoNewline "${escape}]112${bell}"
+    }
+}
 set-PSReadLineKeyHandler -Chord 'Ctrl+e' -Function ViEditVisually
 __ProfileMark "PSReadLine options"
 
@@ -60,6 +69,7 @@ __ProfileMark "env vars"
 Set-Alias -Name 'v' -Value 'nvim'
 Set-Alias -Name 'touch' -Value 'New-Item'
 . "$PSScriptRoot\CoreUtils-Aliases.ps1"
+del alias:ls -Force
 
 function vp { nvim $PROFILE }
 function whereis { Get-Command @args}
