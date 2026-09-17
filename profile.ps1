@@ -59,6 +59,7 @@ __ProfileMark "env vars"
 # General aliases
 Set-Alias -Name 'v' -Value 'nvim'
 Set-Alias -Name 'touch' -Value 'New-Item'
+. "$PSScriptRoot\CoreUtils-Aliases.ps1"
 
 function vp { nvim $PROFILE }
 function whereis { Get-Command @args}
@@ -133,4 +134,3 @@ __ProfileMark "fzf-gitadd-widget.ps1"
 if ($env:PROFILE_TIMING) {
     Write-Host ("[profile] {0,-28} {1,5} ms  (total {2,5} ms)" -f "TOTAL", $script:__profileSw.ElapsedMilliseconds, $script:__profileSw.ElapsedMilliseconds) -ForegroundColor Yellow
 }
-
