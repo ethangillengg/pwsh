@@ -1,17 +1,22 @@
 # Profiling: set $env:PROFILE_TIMING = "1" before launching pwsh to print a
 # breakdown of how long each profile step takes on startup.
-if ($env:PROFILE_TIMING) {
+if ($env:PROFILE_TIMING)
+{
     $script:__profileSw = [System.Diagnostics.Stopwatch]::StartNew()
     $script:__profileLast = 0
-    function __ProfileMark {
+    function __ProfileMark
+    {
         param([string]$Name)
         $elapsed = $script:__profileSw.ElapsedMilliseconds
         $delta = $elapsed - $script:__profileLast
         $script:__profileLast = $elapsed
         Write-Host ("[profile] {0,-28} {1,5} ms  (total {2,5} ms)" -f $Name, $delta, $elapsed) -ForegroundColor DarkGray
     }
-} else {
-    function __ProfileMark { param([string]$Name) }
+} else
+{
+    function __ProfileMark
+    { param([string]$Name) 
+    }
 }
 
 __ProfileMark "start"
@@ -34,9 +39,11 @@ Set-PsReadLineOption -EditMode Vi -ViModeIndicator Script -ViModeChangeHandler {
     param($mode)
     $escape = [char]27
     $bell = [char]7
-    if ($mode -eq 'Command') {
+    if ($mode -eq 'Command')
+    {
         Write-Host -NoNewline "${escape}]12;#c678dd${bell}"
-    } else {
+    } else
+    {
         Write-Host -NoNewline "${escape}]112${bell}"
     }
 }
@@ -71,11 +78,21 @@ Set-Alias -Name 'touch' -Value 'New-Item'
 . "$PSScriptRoot\CoreUtils-Aliases.ps1"
 del alias:ls -Force
 
-function vp { nvim $PROFILE }
-function whereis { Get-Command @args}
-function ll { lsd -l @args}
-function la { lsd -lA @args}
-function lt { lsd -l --tree --depth=4 @args}
+function vp
+{ nvim $PROFILE 
+}
+function whereis
+{ Get-Command @args
+}
+function ll
+{ lsd -l @args
+}
+function la
+{ lsd -lA @args
+}
+function lt
+{ lsd -l --tree --depth=4 @args
+}
 
 # Git aliases
 del alias:gl -Force
@@ -84,20 +101,57 @@ del alias:gc -Force
 del alias:ps -Force
 del alias:gi -Force
 
-function gs  { git status @args }
-function ga  { git add @args }
-function gl  { git log @args }
-function gp  { git push @args }
-function gc  { git commit @args }
-function gd  { git diff @args }
-function gr  { git restore . --staged @args }
-function gsw  { git switch @args }
-function gcA  { git commit --amend @args }
-function gca  { git commit --amend -c HEAD @args }
-function grp  { git rev-parse HEAD @args }
-function gcp  { $commit = git rev-parse HEAD; $commit | Set-Clipboard; echo $commit }
-function gi  { gh dash @args }
-function ps  { handle64 -v @args }
+function gs
+{ git status @args 
+}
+function ga
+{ git add @args 
+}
+function gl
+{ git log @args 
+}
+function gp
+{ git push @args 
+}
+function gc
+{ git commit @args 
+}
+function gd
+{ git diff @args 
+}
+function gr
+{ git restore . --staged @args 
+}
+function glr
+{ git log --oneline --graph --decorate --left-right main...HEAD 
+}
+function gsw
+{ git switch @args 
+}
+function gcA
+{ git commit --amend @args 
+}
+function gca
+{ git commit --amend -c HEAD @args 
+}
+function grp
+{ git rev-parse HEAD @args 
+}
+function gcp
+{ $commit = git rev-parse HEAD; $commit | Set-Clipboard; echo $commit 
+}
+function gi
+{ gh dash @args 
+}
+function ps
+{ handle64 -v @args 
+}
+function dr
+{ dotnet run @args 
+}
+function db
+{ dotnet build @args 
+}
 __ProfileMark "aliases and git functions"
 
 
@@ -141,6 +195,7 @@ __ProfileMark "Functions\Komorebi-Toggle.ps1"
 . "$PSScriptRoot\Functions\Fzf-GitAddWidget.ps1"
 __ProfileMark "fzf-gitadd-widget.ps1"
 
-if ($env:PROFILE_TIMING) {
+if ($env:PROFILE_TIMING)
+{
     Write-Host ("[profile] {0,-28} {1,5} ms  (total {2,5} ms)" -f "TOTAL", $script:__profileSw.ElapsedMilliseconds, $script:__profileSw.ElapsedMilliseconds) -ForegroundColor Yellow
 }
