@@ -69,6 +69,7 @@ $Env:KOMOREBI_CONFIG_HOME = "$HOME\.config\komorebi"
 $ENV:FZF_DEFAULT_OPTS += " --layout=reverse"
 $ENV:YAZI_FILE_ONE += "C:\Program Files\Git\usr\bin\file.exe"
 $Env:COPILOT_AUTO_UPDATE="false" # For: https://github.com/github/copilot-cli/issues/4439
+$ENV:AZURE_TOKEN_CREDENTIALS = "AzureCliCredential"
 __ProfileMark "env vars"
 
 
