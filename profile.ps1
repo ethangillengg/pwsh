@@ -146,8 +146,17 @@ function gi
 function ps
 { handle64 -v @args 
 }
+function d
+{ dotnet @args 
+}
 function dr
-{ dotnet run @args 
+{
+    param(
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]] $RemainingArgs
+    )
+
+    & dotnet run @RemainingArgs
 }
 function db
 { dotnet build @args 
@@ -194,6 +203,10 @@ __ProfileMark "Functions\Komorebi-Toggle.ps1"
 
 . "$PSScriptRoot\Functions\Fzf-GitAddWidget.ps1"
 __ProfileMark "fzf-gitadd-widget.ps1"
+
+. "$PSScriptRoot\Functions\Copilot-ResolveAllowedDirs.ps1"
+Set-Alias -Name 'cop' -Value 'Copilot-ResolveAllowedDirs'
+Set-Alias -Name 'copilot' -Value 'Copilot-ResolveAllowedDirs'
 
 if ($env:PROFILE_TIMING)
 {
