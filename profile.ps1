@@ -193,11 +193,6 @@ __ProfileMark "Functions\New-GitWorktree.ps1"
 Set-Alias -Name 'gb' -Value 'New-GitBranch'
 __ProfileMark "Functions\New-GitBranch.ps1"
 
-
-. "$PSScriptRoot\Functions\Komorebi-RefreshMonitors.ps1"
-Set-Alias -Name 'krf' -Value 'Komorebi-RefreshMonitors'
-__ProfileMark "Functions\Komorebi-RefreshMonitors.ps1"
-
 . "$PSScriptRoot\Functions\Komorebi-Toggle.ps1"
 Set-Alias -Name 'kr' -Value 'Komorebi-Toggle'
 __ProfileMark "Functions\Komorebi-Toggle.ps1"
