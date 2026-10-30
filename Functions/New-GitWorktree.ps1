@@ -61,15 +61,15 @@ Creates:
     origin/eg/fb/8341-remove-invalid-interval-inputs
 
     Worktree:
-    ../8341-remove-invalid-interval-inputs
+    ../<root-dir-name>-8341-remove-invalid-interval-inputs
 
 .EXAMPLE
-gwt fb 8341 remove invalid interval inputs
+gwt add fb 8341 remove invalid interval inputs
 
-Uses the shorter gwt alias.
+Uses the gwt command's add subcommand.
 
 .EXAMPLE
-gwt fb 8341 remove invalid interval inputs -BaseBranch origin/develop
+gwt add fb 8341 remove invalid interval inputs -BaseBranch origin/develop
 
 Creates the branch from origin/develop instead of the default origin branch.
 
@@ -132,7 +132,10 @@ function New-GitWorktree {
 
     # Always create the worktree one directory above the Git root.
     $gitRootParent = Split-Path -Parent $gitRoot
-    $worktreeDirectoryName = "$TaskId-$slug"
+    # Prefix with the main checkout's directory name, even when run from a linked worktree.
+    $commonDir = (git rev-parse --path-format=absolute --git-common-dir).Trim()
+    $rootDirName = Split-Path -Leaf (Split-Path -Parent $commonDir)
+    $worktreeDirectoryName = "$rootDirName-$TaskId-$slug"
     $worktreePath = Join-Path $gitRootParent $worktreeDirectoryName
 
     # Use the default origin branch unless explicitly overridden.
@@ -214,4 +217,163 @@ After resolving the push issue, run:
     Write-Host "  Local:    $branchName"
     Write-Host "  Upstream: origin/$branchName"
     Write-Host "  Path:     $worktreePath"
+}
+
+function Get-GitWorktreePath {
+    git worktree list --porcelain 2>$null |
+        Where-Object { $_ -like 'worktree *' } |
+        ForEach-Object { ($_ -replace '^worktree ', '') -replace '/', '\' }
+}
+
+function Remove-GitWorktreeByName {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [switch]$Force
+    )
+
+    $paths = @(Get-GitWorktreePath)
+
+    if ($paths.Count -eq 0) {
+        throw "The current directory is not inside a Git repository."
+    }
+
+    $mainPath = $paths[0]
+    $normalized = $Name -replace '/', '\'
+    $target = $paths | Select-Object -Skip 1 | Where-Object {
+        $_ -eq $normalized -or (Split-Path -Leaf $_) -eq $normalized
+    } | Select-Object -First 1
+
+    if (-not $target) {
+        throw "No linked worktree matches '$Name'. Run 'git worktree list'."
+    }
+
+    # Git cannot remove a worktree while it is the current directory.
+    $cwd = (Get-Location).ProviderPath
+    if ($cwd -eq $target -or $cwd.StartsWith("$target\")) {
+        Set-Location $mainPath
+    }
+
+    $gitArgs = @('worktree', 'remove')
+    if ($Force) { $gitArgs += '--force' }
+    git @gitArgs $target
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "git worktree remove failed for '$target'. Use -f to force."
+    }
+
+    Write-Host "Removed worktree: $target" -ForegroundColor Green
+}
+
+function gwt {
+    $subcommand, $rest = $args
+    $helpFlags = '-h', '--help'
+
+    if (-not $subcommand -or $subcommand -in $helpFlags) {
+        Write-Host @"
+Usage: gwt <command> [args]
+
+Commands:
+  add    Create a branch and worktree (gwt add -h for details)
+  rm     Remove a worktree (gwt rm -h for details)
+
+Options:
+  -h, --help    Show help
+"@
+        return
+    }
+
+    switch ($subcommand) {
+        'rm' {
+            $rmUsage = @"
+Usage: gwt rm <worktree> [-f]
+
+Remove a linked worktree by directory name or full path. Tab completes names
+from the current repository. The branch is kept.
+
+Options:
+  -f, --force    Remove even with uncommitted changes
+  -h, --help     Show help
+
+Example:
+  gwt rm lite-11714-move-annotations-widget-button
+"@
+            if ($rest | Where-Object { $_ -in $helpFlags }) {
+                Write-Host $rmUsage
+                return
+            }
+
+            $force = [bool]($rest | Where-Object { $_ -in '-f', '--force' })
+            $names = @($rest | Where-Object { $_ -notin '-f', '--force' })
+
+            if ($names.Count -ne 1) {
+                Write-Host $rmUsage
+                return
+            }
+
+            Remove-GitWorktreeByName -Name $names[0] -Force:$force
+        }
+        'add' {
+            $addUsage = @"
+Usage: gwt add <project> <task-id> <description...> [-BaseBranch <ref>]
+
+Create branch eg/<project>/<task-id>-<slug>, push it, and add a worktree at
+../<root>-<task-id>-<slug>, then cd into it.
+
+Arguments:
+  project        Project code, e.g. li
+  task-id        Numeric task id, e.g. 11714
+  description    Words used for the branch/dir slug
+
+Options:
+  -BaseBranch    Base ref (default: origin's default branch)
+  -h, --help     Show help
+
+Example:
+  gwt add li 11714 move annotations widget button
+"@
+
+            if ($rest | Where-Object { $_ -in $helpFlags }) {
+                Write-Host $addUsage
+                return
+            }
+
+            # Positional form needs 3+ tokens once -BaseBranch <ref> is removed.
+            $positional = @()
+            $namedUsed = $false
+            for ($i = 0; $i -lt $rest.Count; $i++) {
+                if ($rest[$i] -eq '-BaseBranch') { $i++ }
+                elseif ("$($rest[$i])".StartsWith('-')) { $namedUsed = $true }
+                else { $positional += $rest[$i] }
+            }
+
+            if (-not $namedUsed -and $positional.Count -lt 3) {
+                Write-Host $addUsage
+                return
+            }
+
+            New-GitWorktree @rest
+        }
+        default { throw "Unknown command '$subcommand'. Run 'gwt -h' for usage." }
+    }
+}
+
+Register-ArgumentCompleter -CommandName gwt -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+
+    $tokens = @($commandAst.CommandElements | Select-Object -Skip 1 | ForEach-Object { $_.ToString() })
+    $completed = if ($wordToComplete) { $tokens.Count - 1 } else { $tokens.Count }
+
+    if ($completed -eq 0) {
+        'add', 'rm' | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+        }
+    }
+    elseif ($completed -eq 1 -and $tokens[0] -eq 'rm') {
+        Get-GitWorktreePath | Select-Object -Skip 1 | ForEach-Object {
+            $leaf = Split-Path -Leaf $_
+            if ($leaf -like "$wordToComplete*") {
+                [System.Management.Automation.CompletionResult]::new($leaf, $leaf, 'ParameterValue', $_)
+            }
+        }
+    }
 }

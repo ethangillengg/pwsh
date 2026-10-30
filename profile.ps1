@@ -186,7 +186,6 @@ Set-Alias -Name 'f' -Value 'yazi'
 __ProfileMark "Functions\Yazi-Persist-Dir.ps1"
 
 . "$PSScriptRoot\Functions\New-GitWorktree.ps1"
-Set-Alias -Name 'gwt' -Value 'New-GitWorktree'
 __ProfileMark "Functions\New-GitWorktree.ps1"
 
 . "$PSScriptRoot\Functions\New-GitBranch.ps1"
