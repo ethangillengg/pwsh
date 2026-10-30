@@ -204,6 +204,9 @@ __ProfileMark "fzf-gitadd-widget.ps1"
 Set-Alias -Name 'cop' -Value 'Copilot-ResolveAllowedDirs'
 Set-Alias -Name 'copilot' -Value 'Copilot-ResolveAllowedDirs'
 
+. "$PSScriptRoot\Functions\Invoke-Adl.ps1"
+__ProfileMark "Functions\Invoke-Adl.ps1"
+
 if ($env:PROFILE_TIMING)
 {
     Write-Host ("[profile] {0,-28} {1,5} ms  (total {2,5} ms)" -f "TOTAL", $script:__profileSw.ElapsedMilliseconds, $script:__profileSw.ElapsedMilliseconds) -ForegroundColor Yellow
