@@ -1,4 +1,4 @@
-$script:AdlScriptsDir = Join-Path $HOME 'code\lite\adl\scripts'
+$script:AdlScriptsDir = Join-Path $PSScriptRoot '..\Scripts\adl'
 
 # Subcommand name -> script. Names and aliases are matched case-insensitively.
 $script:AdlCommands = [ordered]@{
