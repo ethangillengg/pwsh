@@ -6,7 +6,7 @@
 #   Line 1 right: <lightblack> exec-time</>  <black> time</>
 #   Line 2:       <lightGreen|red>❯</> (trailing space)
 
-function Get-PromptPath {
+function Get-ShortPromptPath {
     $path = $PWD.ProviderPath
     $homeDir = $HOME.TrimEnd('\')
     if ($path -eq $homeDir) { return '~' }
@@ -38,8 +38,48 @@ function Format-BranchStatus {
     return ''
 }
 
+function Test-InGitRepo {
+    $dir = $PWD.ProviderPath
+    while ($dir) {
+        $g = [System.IO.Path]::Combine($dir, '.git')
+        if ([System.IO.Directory]::Exists($g) -or [System.IO.File]::Exists($g)) { return $true }
+        $dir = [System.IO.Path]::GetDirectoryName($dir)
+    }
+    return $false
+}
+
+function Get-FastGitStatus {
+    if (-not (Test-InGitRepo)) { return $null }
+    $lines = & 'C:\Program Files\Git\mingw64\bin\git.exe' status --porcelain=v2 --branch 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $lines) { return $null }
+
+    $s = @{ Branch = ''; AheadBy = 0; BehindBy = 0
+        Working = @{ Added = @(); Modified = @(); Deleted = @(); Unmerged = @() }
+        Index = @{ Added = @(); Modified = @(); Deleted = @(); Unmerged = @() } }
+    $oid = ''
+    foreach ($l in $lines) {
+        switch -CaseSensitive ($l[0]) {
+            '#' {
+                if ($l.StartsWith('# branch.head ')) { $s.Branch = $l.Substring(14) }
+                elseif ($l.StartsWith('# branch.oid ')) { $oid = $l.Substring(13, 7) }
+                elseif ($l -match '^# branch\.ab \+(\d+) -(\d+)') { $s.AheadBy = [int]$Matches[1]; $s.BehindBy = [int]$Matches[2] }
+            }
+            '?' { $s.Working.Added += 1 }
+            'u' { $s.Working.Unmerged += 1 }
+            { $_ -in '1', '2' } {
+                switch -CaseSensitive ($l[2]) { 'A' { $s.Index.Added += 1 } 'D' { $s.Index.Deleted += 1 } '.' {} default { $s.Index.Modified += 1 } }
+                switch -CaseSensitive ($l[3]) { 'D' { $s.Working.Deleted += 1 } '.' {} default { $s.Working.Modified += 1 } }
+            }
+        }
+    }
+    if ($s.Branch -eq '(detached)') { $s.Branch = $oid }
+    $s.HasWorking = [bool]($s.Working.Values | Where-Object Count)
+    $s.HasIndex = [bool]($s.Index.Values | Where-Object Count)
+    return [pscustomobject]$s
+}
+
 function Get-GitSegment {
-    $status = Get-GitStatus
+    $status = Get-FastGitStatus
     if (-not $status) { return '' }
 
     $magenta = $PSStyle.Foreground.Magenta
@@ -86,7 +126,7 @@ function prompt {
     $reset = $PSStyle.Reset
 
     # Left side: path + git segment
-    $pathSegment = "${cyan}$(Get-PromptPath)${reset} "
+    $pathSegment = "${cyan}$(Get-ShortPromptPath)${reset} "
     $gitSegment = Get-GitSegment
     $left = $pathSegment + $gitSegment
 

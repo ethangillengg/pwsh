@@ -21,8 +21,16 @@ if ($env:PROFILE_TIMING)
 
 __ProfileMark "start"
 
-Import-Module posh-git
-__ProfileMark "Import-Module posh-git"
+# posh-git costs ~450ms to import, so load it on the first `git <Tab>` instead of at startup.
+Register-ArgumentCompleter -Native -CommandName git -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+    Import-Module posh-git -Global
+    $padLength = $cursorPosition - $commandAst.Extent.StartOffset
+    $text = $commandAst.ToString().PadRight($padLength, ' ').Substring(0, $padLength)
+    & (Get-Module posh-git) { Expand-GitCommand $args[0] } $text
+}
+__ProfileMark "git tab completion (lazy posh-git)"
+
 
 # Custom prompt
 . "$PSScriptRoot\prompt\Prompt.ps1"
@@ -56,6 +64,7 @@ __ProfileMark "PSReadLine options"
 # shown) so the shell feels ready immediately; Ctrl+T/Ctrl+R become live a
 # moment later instead of blocking startup.
 Register-EngineEvent -SourceIdentifier PowerShell.OnIdle -MaxTriggerCount 1 -Action {
+    Import-Module posh-git -Global
     Set-PsFzfOption -PSReadlineChordProvider 'Ctrl+t' -PSReadlineChordReverseHistory 'Ctrl+r'
     Unregister-Event -SourceIdentifier PowerShell.OnIdle -ErrorAction SilentlyContinue
 } | Out-Null
