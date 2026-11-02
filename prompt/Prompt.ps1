@@ -38,20 +38,33 @@ function Format-BranchStatus {
     return ''
 }
 
-function Test-InGitRepo {
+function Find-DotGit {
     $dir = $PWD.ProviderPath
     while ($dir) {
         $g = [System.IO.Path]::Combine($dir, '.git')
-        if ([System.IO.Directory]::Exists($g) -or [System.IO.File]::Exists($g)) { return $true }
+        if ([System.IO.Directory]::Exists($g) -or [System.IO.File]::Exists($g)) { return $g }
         $dir = [System.IO.Path]::GetDirectoryName($dir)
     }
-    return $false
 }
 
-function Get-FastGitStatus {
-    if (-not (Test-InGitRepo)) { return $null }
-    $lines = & 'C:\Program Files\Git\mingw64\bin\git.exe' status --porcelain=v2 --branch 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not $lines) { return $null }
+# Reads the branch straight from HEAD (no git process); handles worktrees where .git is a file.
+function Get-GitBranchFromHead {
+    param([string]$DotGit)
+    if ([System.IO.File]::Exists($DotGit)) {
+        $gitdir = ([System.IO.File]::ReadAllText($DotGit)).Trim()
+        if (-not $gitdir.StartsWith('gitdir: ')) { return }
+        $DotGit = [System.IO.Path]::GetFullPath($gitdir.Substring(8), [System.IO.Path]::GetDirectoryName($DotGit))
+    }
+    $headFile = [System.IO.Path]::Combine($DotGit, 'HEAD')
+    if (-not [System.IO.File]::Exists($headFile)) { return }
+    $head = ([System.IO.File]::ReadAllText($headFile)).Trim()
+    if ($head.StartsWith('ref: refs/heads/')) { return $head.Substring(16) }
+    if ($head.Length -ge 7) { return $head.Substring(0, 7) }
+}
+
+function ConvertFrom-GitStatusLines {
+    param([string[]]$lines)
+    if (-not $lines) { return $null }
 
     $s = @{ Branch = ''; AheadBy = 0; BehindBy = 0
         Working = @{ Added = @(); Modified = @(); Deleted = @(); Unmerged = @() }
@@ -79,7 +92,8 @@ function Get-FastGitStatus {
 }
 
 function Get-GitSegment {
-    $status = Get-FastGitStatus
+    param([string[]]$Lines, [string]$Branch)
+    $status = if ($Lines) { ConvertFrom-GitStatusLines $Lines } elseif ($Branch) { [pscustomobject]@{ Branch = $Branch; HasWorking = $false; HasIndex = $false; AheadBy = 0; BehindBy = 0 } }
     if (-not $status) { return '' }
 
     $magenta = $PSStyle.Foreground.Magenta
@@ -116,6 +130,89 @@ function Get-VisibleLength {
     return ([regex]::Replace($Text, "`e\[[0-9;]*m", '')).Length
 }
 
+function Format-PromptLine1 {
+    param([string]$Left, [string]$Right, [int]$Width)
+    $padding = $Width - (Get-VisibleLength $Left) - (Get-VisibleLength $Right)
+    if ($padding -lt 1) { $padding = 1 }
+    return "$Left$(' ' * $padding)$Right"
+}
+
+# Rows between the first prompt line and the cursor, accounting for typed text that wraps or has newlines.
+function Get-RowsAbovePromptLine1 {
+    param([int]$Width)
+    $buf = $null; $cur = 0
+    [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$buf, [ref]$cur)
+    $row = 1; $col = 2
+    for ($i = 0; $i -lt $cur; $i++) {
+        if ($buf[$i] -eq "`n") { $row++; $col = 0; continue }
+        if (++$col -ge $Width) { $row++; $col = 0 }
+    }
+    return $row
+}
+
+# Runs git status in the background; when it finishes (and the prompt is still the current one)
+# the first prompt line is redrawn in place with the git segment.
+function Update-PromptGitSegment {
+    param($d)
+    try {
+        $d.Proc.WaitForExit()
+        if ($global:__promptId -eq $d.Id -and $d.Proc.ExitCode -eq 0) {
+            $segment = Get-GitSegment ($d.Task.Result -split "`n")
+            if ($segment) {
+                $width = $Host.UI.RawUI.WindowSize.Width
+                $line = Format-PromptLine1 ($d.PathSegment + $segment) $d.Right $width
+                $up = Get-RowsAbovePromptLine1 $width
+                [Console]::Write("`e7`e[${up}A`r$line`e8")
+            }
+        }
+    } finally {
+        $d.Proc.Dispose()
+    }
+}
+
+function Start-AsyncGitStatus {
+    param([int]$Id, [string]$PathSegment, [string]$Right)
+    $psi = [System.Diagnostics.ProcessStartInfo]::new('C:\Program Files\Git\mingw64\bin\git.exe')
+    foreach ($a in 'status', '--porcelain=v2', '--branch') { $psi.ArgumentList.Add($a) }
+    $psi.WorkingDirectory = $PWD.ProviderPath
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $proc = [System.Diagnostics.Process]::new()
+    $proc.StartInfo = $psi
+    $proc.EnableRaisingEvents = $true
+    $data = @{ Id = $Id; PathSegment = $PathSegment; Right = $Right; Proc = $proc; Clock = [System.Diagnostics.Stopwatch]::StartNew() }
+    $null = Register-ObjectEvent -InputObject $proc -EventName Exited -MessageData $data -Action {
+        $d = $Event.MessageData
+        try {
+            # Events can be processed before the prompt is on screen (e.g. at startup); defer so the redraw doesn't land on an empty screen
+            $remaining = 150 - $d.Clock.ElapsedMilliseconds
+            if ($remaining -gt 0) {
+                $timer = [System.Timers.Timer]::new($remaining)
+                $timer.AutoReset = $false
+                $null = Register-ObjectEvent -InputObject $timer -EventName Elapsed -MessageData $d -Action {
+                    try { Update-PromptGitSegment $Event.MessageData }
+                    finally {
+                        $Sender.Dispose()
+                        Unregister-Event -SubscriptionId $EventSubscriber.SubscriptionId
+                        Remove-Job -Id $EventSubscriber.Action.Id -Force
+                    }
+                }
+                $timer.Start()
+            } else {
+                Update-PromptGitSegment $d
+            }
+        } finally {
+            Unregister-Event -SubscriptionId $EventSubscriber.SubscriptionId
+            Remove-Job -Id $EventSubscriber.Action.Id -Force
+        }
+    }
+    [void]$proc.Start()
+    $data.Task = $proc.StandardOutput.ReadToEndAsync()
+    $null = $proc.StandardError.ReadToEndAsync()
+}
+
 function prompt {
     $previousCommandFailed = -not $?
     $cyan = $PSStyle.Foreground.Cyan
@@ -125,10 +222,8 @@ function prompt {
     $red = $PSStyle.Foreground.Red
     $reset = $PSStyle.Reset
 
-    # Left side: path + git segment
-    $pathSegment = "${cyan}$(Get-ShortPromptPath)${reset} "
-    $gitSegment = Get-GitSegment
-    $left = $pathSegment + $gitSegment
+    # Left side: path now, git segment is filled in asynchronously
+    $left = "${cyan}$(Get-ShortPromptPath)${reset} "
 
     # Right side: last command execution time (if over 10ms) + current time
     $right = ''
@@ -144,12 +239,15 @@ function prompt {
     $right += "${black} ${timeStr} $([char]0xf017) ${reset}"
 
     $width = $Host.UI.RawUI.WindowSize.Width
-    $leftLen = Get-VisibleLength $left
-    $rightLen = Get-VisibleLength $right
-    $padding = $width - $leftLen - $rightLen
-    if ($padding -lt 1) { $padding = 1 }
+    $global:__promptId++
+    $dotGit = Find-DotGit
+    $line1Left = $left
+    if ($dotGit) {
+        Start-AsyncGitStatus $global:__promptId $left $right
+        $line1Left += Get-GitSegment -Branch (Get-GitBranchFromHead $dotGit)
+    }
 
     $arrowColor = if ($previousCommandFailed) { $red } else { $lightGreen }
     $null = Get-Variable -Name PSVersionTable
-    return "$left$(' ' * $padding)$right`n${arrowColor}❯${reset} "
+    return "$(Format-PromptLine1 $line1Left $right $width)`n${arrowColor}❯${reset} "
 }
